@@ -1,0 +1,4 @@
+[error] C:\Users\mr76265\fpinscala\project\state.scala:16:1: expected class or object definition
+[error] type Rand[+A] = RNG => (A, RNG)
+[error] ^
+[error] one error found
