@@ -4,7 +4,7 @@
 		module="ideaproject$sources"
 		revision="0.1"
 		status="integration"
-		publication="20180801100301"
+		publication="20180802080420"
 	/>
 	<configurations>
 		<conf name="compile" visibility="public" description=""/>

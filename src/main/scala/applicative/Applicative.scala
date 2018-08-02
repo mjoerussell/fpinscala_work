@@ -109,6 +109,13 @@ object Monad {
 	}
 	def getState[S]: State[S, S] = State(s => (s, s))
 	def setState[S](s: S): State[S, Unit] = State(_ => ((), s))
+	
+	def composeM[F[_], G[_]](F: Monad[F], G: Monad[G], T: Traverse[G]): Monad[({ type f[x] = F[G[x]] })#f] = new Monad[({ type f[x] = F[G[x]] })#f] {
+		def unit[A](a: => A): F[G[A]] = F.unit(G.unit(a))
+		override def flatMap[A, B](fa: F[G[A]])(f: A => F[G[B]]): F[G[B]] =
+			F.flatMap(fa)(ga => F.map(T.traverse(ga)(f)(F))(G.join))
+	}
+	
 }
 
 sealed trait Validation[+E, +A]
@@ -119,7 +126,7 @@ sealed trait Tree[+A]
 case class Leaf[A](value: A) extends Tree[A]
 case class Branch[A](value: A, left: Tree[A], right: Tree[A]) extends Tree[A]
 
-trait Traverse[F[_]] extends Functor[F] with Foldable[F]{
+trait Traverse[F[_]] extends Functor[F] with Foldable[F] { self =>
 	def traverse[G[_], A, B](fa: F[A])(f: A => G[B])(implicit G: Applicative[G]): G[F[B]] = sequence(map(fa)(f))
 	def sequence[G[_], A](fga: F[G[A]])(implicit G: Applicative[G]): G[F[A]] = traverse(fga)(ga => ga)
 	
@@ -150,17 +157,26 @@ trait Traverse[F[_]] extends Functor[F] with Foldable[F]{
 	
 	def reverse[A](fa: F[A]): F[A] = mapAccum(fa, toList(fa).reverse)((_, as) => (as.head, as.tail))._1
 	
+	def fuse[G[_], H[_], A, B](fa: F[A])(f: A => G[B])(g: A => H[B])(G: Applicative[G])(H: Applicative[H]): (G[F[B]], H[F[B]]) =
+		traverse[({ type f[x] = (G[x], H[x])})#f, A, B](fa)(a => (f(a), g(a)))(G product H)
+	
+	def compose[G[_]](implicit G: Traverse[G]): Traverse[({ type f[x] = F[G[x]] })#f] = new Traverse[({ type f[x] = F[G[x]]})#f] {
+		override def traverse[M[_]: Applicative, A, B](fa: F[G[A]])(f: A => M[B]) =
+			self.traverse(fa)((ga: G[A]) => G.traverse(ga)(f))
+	}
+	
+	
 }
 
 object Traverse {
-	def treeTraverse[A]: Traverse[Tree] = new Traverse[Tree] {
-		override def map[A, B](fa: Tree[A])(f: A => B): Tree[B] = fa match {
-			case Leaf(v) => Leaf(f(v))
-			case Branch(v, l, r) => Branch(f(v), map(l)(f), map(r)(f))
-		}
-		
-		override def sequence[G[_], A](fga: Tree[G[A]])(implicit G: Applicative[G]): G[Tree[A]] = 
-	}
+//	def treeTraverse[A]: Traverse[Tree] = new Traverse[Tree] {
+//		override def map[A, B](fa: Tree[A])(f: A => B): Tree[B] = fa match {
+//			case Leaf(v) => Leaf(f(v))
+//			case Branch(v, l, r) => Branch(f(v), map(l)(f), map(r)(f))
+//		}
+//
+//		override def sequence[G[_], A](fga: Tree[G[A]])(implicit G: Applicative[G]): G[Tree[A]] =
+//	}
 }
 
 
